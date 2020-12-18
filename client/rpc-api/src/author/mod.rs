@@ -101,4 +101,27 @@ pub trait AuthorApi<Hash, BlockHash> {
 		metadata: Option<Self::Metadata>,
 		id: SubscriptionId
 	) -> Result<bool>;
+	
+	/// life cycle.
+	#[pubsub(
+		subscription = "author_extrinsicUpdate",
+		subscribe,
+		name = "author_trackExtrinsic"
+	)]
+	fn track_extrinsic(&self,
+		metadata: Self::Metadata,
+		subscriber: Subscriber<TransactionStatus<Hash, BlockHash>>,
+		hash: ExtrinsicHash,
+	);
+
+	/// Unsubscribe from extrinsic track.
+	#[pubsub(
+		subscription = "author_extrinsicUpdate",
+		unsubscribe,
+		name = "author_untrackExtrinsic"
+	)]
+	fn untrack_extrinsic(&self,
+		metadata: Option<Self::Metadata>,
+		id: SubscriptionId
+	) -> Result<bool>;
 }

@@ -279,6 +279,11 @@ impl<B: ChainApi> ValidatedPool<B> {
 			ValidatedTransaction::Unknown(_, err) => Err(err.into()),
 		}
 	}
+	
+	/// Watch some existing transaction with known hash.
+	pub fn watch(&self, hash: ExtrinsicHash<B>) -> Watcher<ExtrinsicHash<B>, ExtrinsicHash<B>> {
+		self.listener.write().create_watcher(hash)
+	}
 
 	/// Resubmits revalidated transactions back to the pool.
 	///

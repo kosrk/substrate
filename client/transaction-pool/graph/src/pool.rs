@@ -210,6 +210,18 @@ impl<B: ChainApi> Pool<B> {
 		).await;
 		self.validated_pool.submit_and_watch(tx)
 	}
+	
+	// Watch existing transaction
+	///
+	/// Get notified when some existing transaction is finished verifying or gets finalized
+	/// in a new block.
+	pub fn watch(
+		&self,
+		hash: ExHash<B>,
+	) -> Watcher<ExtrinsicHash<B>, ExtrinsicHash<B>> {
+		self.validated_pool.watch(hash)
+	}
+
 
 	/// Resubmit some transaction that were validated elsewhere.
 	pub fn resubmit(

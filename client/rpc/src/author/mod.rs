@@ -237,4 +237,25 @@ impl<P, Client> AuthorApi<TxHash<P>, BlockHash<P>> for Author<P, Client>
 	fn unwatch_extrinsic(&self, _metadata: Option<Self::Metadata>, id: SubscriptionId) -> Result<bool> {
 		Ok(self.subscriptions.cancel(id))
 	}
+
+	fn track_extrinsic(&self,
+		_metadata: Self::Metadata,
+		subscriber: Subscriber<TransactionStatus<TxHash<P>, BlockHash<P>>>,
+		hash: ExtrinsicHash,
+	) {
+		let watcher = self.pool.watch(hash).into_stream().map(|v| Ok::<_, ()>(Ok(v)));
+		let subscriptions = self.subscriptions.clone();
+
+		subscriptions.add(subscriber,
+			move |sink| {
+				sink.sink_map_err(|_| unimplemented!())
+					.send_all(Compat::new(watcher))
+					.map(|_| ())
+			}
+		);
+	}
+	
+	fn untrack_extrinsic(&self, _metadata: Option<Self::Metadata>, id: SubscriptionId) -> Result<bool> {
+		Ok(self.subscriptions.cancel(id))
+	}
 }
