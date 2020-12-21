@@ -217,11 +217,12 @@ impl<B: ChainApi> Pool<B> {
 	/// in a new block.
 	pub fn watch(
 		&self,
+		at: &BlockId<B::Block>,
+		source: TransactionSource,
 		hash: ExtrinsicHash<B>,
 	) -> Watcher<ExtrinsicHash<B>, ExtrinsicHash<B>> {
 		self.validated_pool.watch(hash)
 	}
-
 
 	/// Resubmit some transaction that were validated elsewhere.
 	pub fn resubmit(

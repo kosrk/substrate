@@ -280,6 +280,15 @@ impl<PoolApi, Block> TransactionPool for BasicPool<PoolApi, Block>
 				.await
 		}.boxed()
 	}
+	
+	fn watch(
+		&self,
+		at: &BlockId<Self::Block>,
+		source: TransactionSource,
+		hash: TxHash<Self>,
+	) -> PoolFuture<Box<TransactionStatusStreamFor<Self>>, Self::Error> {
+		Box::pin(self.pool.watch(&at, source, hash))
+	}
 
 	fn remove_invalid(&self, hashes: &[TxHash<Self>]) -> Vec<Arc<Self::InPoolTransaction>> {
 		let removed = self.pool.validated_pool().remove_invalid(hashes);

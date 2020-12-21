@@ -241,9 +241,9 @@ impl<P, Client> AuthorApi<TxHash<P>, BlockHash<P>> for Author<P, Client>
 	fn track_extrinsic(&self,
 		_metadata: Self::Metadata,
 		subscriber: Subscriber<TransactionStatus<TxHash<P>, BlockHash<P>>>,
-		hash: ExtrinsicHash,
+		hash: TxHash<P>,
 	) {
-		let watcher = self.pool.watch(hash).into_stream().map(|v| Ok::<_, ()>(Ok(v)));
+		let watcher = self.pool.watch(&generic::BlockId::hash(best_block_hash), TX_SOURCE, hash).into_stream().map(|v| Ok::<_, ()>(Ok(v)));
 		let subscriptions = self.subscriptions.clone();
 
 		subscriptions.add(subscriber,
@@ -253,5 +253,9 @@ impl<P, Client> AuthorApi<TxHash<P>, BlockHash<P>> for Author<P, Client>
 					.map(|_| ())
 			}
 		);
+	}
+	
+	fn untrack_extrinsic(&self, _metadata: Option<Self::Metadata>, id: SubscriptionId) -> Result<bool> {
+		Ok(self.subscriptions.cancel(id))
 	}
 }
