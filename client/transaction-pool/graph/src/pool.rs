@@ -217,7 +217,7 @@ impl<B: ChainApi> Pool<B> {
 	/// in a new block.
 	pub fn watch(
 		&self,
-		hash: ExHash<B>,
+		hash: ExtrinsicHash<B>,
 	) -> Watcher<ExtrinsicHash<B>, ExtrinsicHash<B>> {
 		self.validated_pool.watch(hash)
 	}

@@ -254,8 +254,4 @@ impl<P, Client> AuthorApi<TxHash<P>, BlockHash<P>> for Author<P, Client>
 			}
 		);
 	}
-	
-	fn untrack_extrinsic(&self, _metadata: Option<Self::Metadata>, id: SubscriptionId) -> Result<bool> {
-		Ok(self.subscriptions.cancel(id))
-	}
 }
