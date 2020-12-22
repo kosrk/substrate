@@ -243,16 +243,45 @@ impl<P, Client> AuthorApi<TxHash<P>, BlockHash<P>> for Author<P, Client>
 		subscriber: Subscriber<TransactionStatus<TxHash<P>, BlockHash<P>>>,
 		hash: TxHash<P>,
 	) {
-		let watcher = self.pool.watch(&generic::BlockId::hash(best_block_hash), TX_SOURCE, hash).into_stream().map(|v| Ok::<_, ()>(Ok(v)));
-		let subscriptions = self.subscriptions.clone();
+		let submit = || -> Result<_> {
+			Ok(
+				self.pool
+					.watch(hash)
+					.map_err(|e| e.into_pool_error()
+						.map(error::Error::from)
+						.unwrap_or_else(|e| error::Error::Verification(Box::new(e)).into())
+					)
+			)
+		};
 
-		subscriptions.add(subscriber,
-			move |sink| {
-				sink.sink_map_err(|_| unimplemented!())
-					.send_all(Compat::new(watcher))
-					.map(|_| ())
-			}
-		);
+		let subscriptions = self.subscriptions.clone();
+		let future = ready(submit())
+			.and_then(|res| res)
+			// convert the watcher into a `Stream`
+			.map(|res| res.map(|stream| stream.map(|v| Ok::<_, ()>(Ok(v)))))
+			// now handle the import result,
+			// start a new subscrition
+			.map(move |result| match result {
+				Ok(watcher) => {
+					subscriptions.add(subscriber, move |sink| {
+						sink
+							.sink_map_err(|e| log::debug!("Subscription sink failed: {:?}", e))
+							.send_all(Compat::new(watcher))
+							.map(|_| ())
+					});
+				},
+				Err(err) => {
+					warn!("Failed to submit extrinsic: {}", err);
+					// reject the subscriber (ignore errors - we don't care if subscriber is no longer there).
+					let _ = subscriber.reject(err.into());
+				},
+			});
+
+		let res = self.subscriptions.executor()
+			.execute(Box::new(Compat::new(future.map(|_| Ok(())))));
+		if res.is_err() {
+			warn!("Error spawning subscription RPC task.");
+		}
 	}
 	
 	fn untrack_extrinsic(&self, _metadata: Option<Self::Metadata>, id: SubscriptionId) -> Result<bool> {

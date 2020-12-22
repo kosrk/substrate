@@ -217,10 +217,8 @@ impl<B: ChainApi> Pool<B> {
 	/// in a new block.
 	pub fn watch(
 		&self,
-		at: &BlockId<B::Block>,
-		source: TransactionSource,
 		hash: ExtrinsicHash<B>,
-	) -> Watcher<ExtrinsicHash<B>, ExtrinsicHash<B>> {
+	) -> Result<Watcher<ExtrinsicHash<B>, ExtrinsicHash<B>>, B::Error> {
 		self.validated_pool.watch(hash)
 	}
 

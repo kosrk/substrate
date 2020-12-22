@@ -214,8 +214,6 @@ pub trait TransactionPool: Send + Sync {
 	
 	fn watch(
 		&self,
-		at: &BlockId<Self::Block>,
-		source: TransactionSource,
 		hash: TxHash<Self>,
 	) -> PoolFuture<Box<TransactionStatusStreamFor<Self>>, Self::Error>;
 

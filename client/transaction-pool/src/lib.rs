@@ -283,11 +283,9 @@ impl<PoolApi, Block> TransactionPool for BasicPool<PoolApi, Block>
 	
 	fn watch(
 		&self,
-		at: &BlockId<Self::Block>,
-		source: TransactionSource,
 		hash: TxHash<Self>,
 	) -> PoolFuture<Box<TransactionStatusStreamFor<Self>>, Self::Error> {
-		Box::pin(self.pool.watch(&at, source, hash))
+		Box::pin(self.pool.watch(hash))
 	}
 
 	fn remove_invalid(&self, hashes: &[TxHash<Self>]) -> Vec<Arc<Self::InPoolTransaction>> {
