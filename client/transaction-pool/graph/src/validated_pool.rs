@@ -281,8 +281,8 @@ impl<B: ChainApi> ValidatedPool<B> {
 	}
 	
 	/// Watch some existing transaction with known hash.
-	pub fn watch(&self, hash: ExtrinsicHash<B>) -> Result<Watcher<ExtrinsicHash<B>, ExtrinsicHash<B>>, B::Error> {
-		Ok(self.listener.write().create_watcher(hash))
+	pub fn watch(&self, hash: ExtrinsicHash<B>) -> Watcher<ExtrinsicHash<B>, ExtrinsicHash<B>> {
+		self.listener.write().create_watcher(hash)
 	}
 
 	/// Resubmits revalidated transactions back to the pool.

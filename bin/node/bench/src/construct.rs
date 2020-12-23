@@ -259,6 +259,13 @@ impl sp_transaction_pool::TransactionPool for Transactions {
 	) -> PoolFuture<Box<TransactionStatusStreamFor<Self>>, Self::Error> {
 		unimplemented!()
 	}
+	
+	fn watch(
+		&self,
+		_hash: TxHash<Self>,
+	) -> PoolFuture<Box<TransactionStatusStreamFor<Self>>, Self::Error> {
+		unimplemented!()
+	}
 
 	fn ready_at(&self, _at: NumberFor<Self::Block>)
 		-> Pin<Box<dyn Future<Output=Box<dyn Iterator<Item=Arc<Self::InPoolTransaction>> + Send>> + Send>>
