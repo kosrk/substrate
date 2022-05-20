@@ -211,6 +211,11 @@ pub trait TransactionPool: Send + Sync {
 		source: TransactionSource,
 		xt: TransactionFor<Self>,
 	) -> PoolFuture<Box<TransactionStatusStreamFor<Self>>, Self::Error>;
+	
+	fn watch(
+		&self,
+		hash: TxHash<Self>,
+	) -> PoolFuture<Box<TransactionStatusStreamFor<Self>>, Self::Error>;
 
 	// *** Block production / Networking
 	/// Get an iterator for ready transactions ordered by priority.

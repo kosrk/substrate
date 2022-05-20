@@ -281,6 +281,16 @@ impl<PoolApi, Block> TransactionPool for BasicPool<PoolApi, Block>
 				.await
 		}.boxed()
 	}
+	
+	fn watch(
+		&self,
+		hash: TxHash<Self>,
+	) -> PoolFuture<Box<TransactionStatusStreamFor<Self>>, Self::Error> {
+		let pool = self.pool.clone();
+		async move {
+			Ok(Box::new(pool.watch(hash).into_stream()) as _)
+		}.boxed()
+	}
 
 	fn remove_invalid(&self, hashes: &[TxHash<Self>]) -> Vec<Arc<Self::InPoolTransaction>> {
 		let removed = self.pool.validated_pool().remove_invalid(hashes);
