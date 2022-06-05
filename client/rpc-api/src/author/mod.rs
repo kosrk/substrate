@@ -101,7 +101,7 @@ pub trait AuthorApi<Hash, BlockHash> {
 		metadata: Option<Self::Metadata>,
 		id: SubscriptionId
 	) -> Result<bool>;
-	
+
 	/// life cycle.
 	#[pubsub(
 		subscription = "author_extrinsicUpdate2",
@@ -121,6 +121,28 @@ pub trait AuthorApi<Hash, BlockHash> {
 		name = "author_untrackExtrinsic"
 	)]
 	fn untrack_extrinsic(&self,
+		metadata: Option<Self::Metadata>,
+		id: SubscriptionId
+	) -> Result<bool>;
+
+	/// Subscribe to pending extrinsics.
+	#[pubsub(
+		subscription = "author_extrinsicUpdate3",
+		subscribe,
+		name = "author_trackPendingExtrinsic"
+	)]
+	fn watch_pending_extrinsics(&self,
+		metadata: Self::Metadata,
+		subscriber: Subscriber<Bytes>,
+	);
+
+	/// Unsubscribe from pending extrinsics.
+	#[pubsub(
+		subscription = "author_extrinsicUpdate3",
+		unsubscribe,
+		name = "author_untrackPendingExtrinsic"
+	)]
+	fn unwatch_pending_extrinsics(&self,
 		metadata: Option<Self::Metadata>,
 		id: SubscriptionId
 	) -> Result<bool>;

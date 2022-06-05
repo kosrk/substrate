@@ -46,7 +46,7 @@ use sp_core::traits::SpawnNamed;
 use sp_transaction_pool::{
 	TransactionPool, PoolStatus, ImportNotificationStream, TxHash, TransactionFor,
 	TransactionStatusStreamFor, MaintainedTransactionPool, PoolFuture, ChainEvent,
-	TransactionSource,
+	TransactionSource, ExtrinsicsStreamFor
 };
 use sc_transaction_graph::{ChainApi, ExtrinsicHash};
 use wasm_timer::Instant;
@@ -281,7 +281,7 @@ impl<PoolApi, Block> TransactionPool for BasicPool<PoolApi, Block>
 				.await
 		}.boxed()
 	}
-	
+
 	fn watch(
 		&self,
 		hash: TxHash<Self>,
@@ -289,6 +289,15 @@ impl<PoolApi, Block> TransactionPool for BasicPool<PoolApi, Block>
 		let pool = self.pool.clone();
 		async move {
 			Ok(Box::new(pool.watch(hash).into_stream()) as _)
+		}.boxed()
+	}
+
+	fn watch_pending(
+		&self,
+	) -> PoolFuture<Box<ExtrinsicsStreamFor>, Self::Error> {
+		let pool = self.pool.clone();
+		async move {
+			Ok(Box::new(pool.watch_pending().into_stream()) as _)
 		}.boxed()
 	}
 

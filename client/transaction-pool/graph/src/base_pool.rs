@@ -55,6 +55,8 @@ pub enum Imported<Hash, Ex> {
 		failed: Vec<Hash>,
 		/// Transactions removed from the Ready pool (replaced).
 		removed: Vec<Arc<Transaction<Hash, Ex>>>,
+		// Transaction data.
+		transactions: Vec<Arc<Transaction<Hash, Ex>>>,
 	},
 	/// Transaction was successfully imported to Future queue.
 	Future {
@@ -303,13 +305,15 @@ impl<Hash: hash::Hash + Member + Serialize, Ex: std::fmt::Debug> BasePool<Hash, 
 	/// NOTE the transaction has to have all requirements satisfied.
 	fn import_to_ready(&mut self, tx: WaitingTransaction<Hash, Ex>) -> error::Result<Imported<Hash, Ex>> {
 		let hash = tx.transaction.hash.clone();
+		let trans = tx.transaction.clone();
+		let mut transactions = vec![];
 		let mut promoted = vec![];
 		let mut failed = vec![];
 		let mut removed = vec![];
-
 		let mut first = true;
 		let mut to_import = vec![tx];
 
+		transactions.push(trans);
 		// take first transaction from the list
 		while let Some(tx) = to_import.pop() {
 			// find transactions in Future that it unlocks
@@ -317,9 +321,11 @@ impl<Hash: hash::Hash + Member + Serialize, Ex: std::fmt::Debug> BasePool<Hash, 
 
 			// import this transaction
 			let current_hash = tx.transaction.hash.clone();
+			let mut current_tx = tx.transaction.clone();
 			match self.ready.import(tx) {
 				Ok(mut replaced) => {
 					if !first {
+						transactions.push(current_tx);
 						promoted.push(current_hash);
 					}
 					// The transactions were removed from the ready pool. We might attempt to re-import them.
@@ -355,6 +361,7 @@ impl<Hash: hash::Hash + Member + Serialize, Ex: std::fmt::Debug> BasePool<Hash, 
 			promoted,
 			failed,
 			removed,
+			transactions,
 		})
 	}
 
@@ -711,6 +718,7 @@ mod tests {
 			promoted: vec![1, 2, 3, 4],
 			failed: vec![],
 			removed: vec![],
+			transactions: vec![],
 		});
 	}
 
@@ -786,6 +794,7 @@ mod tests {
 			promoted: vec![1, 3],
 			failed: vec![2],
 			removed: vec![],
+			transactions: vec![],
 		});
 		assert_eq!(pool.future.len(), 0);
 	}
@@ -1049,6 +1058,7 @@ mod tests {
 			promoted: vec![],
 			failed: vec![],
 			removed: vec![],
+			transactions: vec![],
 		});
 		assert_eq!(result.promoted.len(), 1);
 		assert_eq!(pool.future.len(), 0);

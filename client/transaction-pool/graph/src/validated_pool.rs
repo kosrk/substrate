@@ -21,6 +21,7 @@ use std::{
 	hash,
 	sync::Arc,
 };
+use sp_core::Bytes;
 
 use serde::Serialize;
 use parking_lot::{Mutex, RwLock};
@@ -28,8 +29,9 @@ use sp_runtime::{
 	generic::BlockId,
 	traits::{self, SaturatedConversion},
 	transaction_validity::{TransactionTag as Tag, ValidTransaction, TransactionSource},
+	codec::{Encode},
 };
-use sp_transaction_pool::{error, PoolStatus};
+use sp_transaction_pool::{error, InPoolTransaction, PoolStatus};
 use wasm_timer::Instant;
 use futures::channel::mpsc::{channel, Sender};
 use retain_mut::RetainMut;
@@ -37,7 +39,7 @@ use retain_mut::RetainMut;
 use crate::base_pool::{self as base, PruneStatus};
 use crate::listener::Listener;
 use crate::rotator::PoolRotator;
-use crate::watcher::Watcher;
+use crate::watcher::{Watcher, PendingExWatcher};
 use crate::pool::{
 	EventStream, Options, ChainApi, BlockHash, ExtrinsicHash, ExtrinsicFor, TransactionFor,
 };
@@ -298,10 +300,15 @@ impl<B: ChainApi> ValidatedPool<B> {
 			ValidatedTransaction::Unknown(_, err) => Err(err),
 		}
 	}
-	
+
 	/// Watch some existing transaction with known hash.
 	pub fn watch(&self, hash: ExtrinsicHash<B>) -> Watcher<ExtrinsicHash<B>, ExtrinsicHash<B>> {
 		self.listener.write().create_watcher(hash)
+	}
+
+	/// Watch pending transactions.
+	pub fn watch_pending(&self) -> PendingExWatcher {
+		self.listener.write().create_pending_ex_watcher()
 	}
 
 	/// Resubmits revalidated transactions back to the pool.
@@ -311,7 +318,7 @@ impl<B: ChainApi> ValidatedPool<B> {
 	pub fn resubmit(&self, mut updated_transactions: HashMap<ExtrinsicHash<B>, ValidatedTransactionFor<B>>) {
 		#[derive(Debug, Clone, Copy, PartialEq)]
 		enum Status { Future, Ready, Failed, Dropped }
-
+		let mut txs = vec![];
 		let (mut initial_statuses, final_statuses) = {
 			let mut pool = self.pool.write();
 
@@ -364,7 +371,8 @@ impl<B: ChainApi> ValidatedPool<B> {
 					match tx_to_resubmit {
 						ValidatedTransaction::Valid(tx) => match pool.import(tx) {
 							Ok(imported) => match imported {
-								base::Imported::Ready { promoted, failed, removed, .. } => {
+								base::Imported::Ready { promoted, failed, removed, transactions,.. } => {
+									txs = transactions;
 									final_statuses.insert(hash, Status::Ready);
 									for hash in promoted {
 										final_statuses.insert(hash, Status::Ready);
@@ -413,12 +421,16 @@ impl<B: ChainApi> ValidatedPool<B> {
 
 		// and now let's notify listeners about status changes
 		let mut listener = self.listener.write();
+		let mut i = 0;
 		for (hash, final_status) in final_statuses {
 			let initial_status = initial_statuses.remove(&hash);
 			if initial_status.is_none() || Some(final_status) != initial_status {
 				match final_status {
 					Status::Future => listener.future(&hash),
-					Status::Ready => listener.ready(&hash, None),
+					Status::Ready => {
+						listener.ready(&hash, None, txs[i].data.encode().into());
+						i += 1;
+					},
 					Status::Dropped => listener.dropped(&hash, None),
 					Status::Failed => listener.invalid(&hash, initial_status.is_some()),
 				}
@@ -633,7 +645,7 @@ impl<B: ChainApi> ValidatedPool<B> {
 	}
 }
 
-fn fire_events<H, B, Ex>(
+fn fire_events<H, B, Ex: Encode>(
 	listener: &mut Listener<H, B>,
 	imported: &base::Imported<H, Ex>,
 ) where
@@ -641,8 +653,10 @@ fn fire_events<H, B, Ex>(
 	B: ChainApi,
 {
 	match *imported {
-		base::Imported::Ready { ref promoted, ref failed, ref removed, ref hash } => {
-			listener.ready(hash, None);
+		base::Imported::Ready { ref promoted, ref failed, ref removed, ref hash, ref transactions,.. } => {
+			let bytes = transactions[0].data().encode().into();
+			let mut i = 1;
+			listener.ready(hash, None, bytes);
 			for f in failed {
 				listener.invalid(f, true);
 			}
@@ -650,7 +664,8 @@ fn fire_events<H, B, Ex>(
 				listener.dropped(&r.hash, Some(hash));
 			}
 			for p in promoted {
-				listener.ready(p, None);
+				listener.ready(p, None,transactions[i].data.encode().into());
+				i += 1;
 			}
 		},
 		base::Imported::Future { ref hash } => {

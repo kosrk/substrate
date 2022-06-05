@@ -21,6 +21,9 @@
 use futures::Stream;
 use sp_transaction_pool::TransactionStatus;
 use sp_utils::mpsc::{tracing_unbounded, TracingUnboundedSender, TracingUnboundedReceiver};
+use sp_core::Bytes;
+
+use futures::channel::mpsc::{self};
 
 /// Extrinsic watcher.
 ///
@@ -135,5 +138,58 @@ impl<H: Clone, BH: Clone> Sender<H, BH> {
 
 	fn send(&mut self, status: TransactionStatus<H, BH>) {
 		self.receivers.retain(|sender| sender.unbounded_send(status.clone()).is_ok())
+	}
+}
+
+/// Represents a stream of pending extrinsics.
+#[derive(Debug)]
+pub struct PendingExWatcher {
+	receiver: TracingUnboundedReceiver<Bytes>,
+}
+
+impl PendingExWatcher {
+	/// Pipe the notifications to given sink.
+	///
+	/// Make sure to drive the future to completion.
+	pub fn into_stream(self) -> impl Stream<Item=Bytes> {
+		self.receiver
+	}
+}
+
+/// PendingExSender part of the PendingExWatcher.
+#[derive(Debug)]
+pub struct PendingExSender {
+	receiver: Option<TracingUnboundedSender<Bytes>>,
+	is_finalized: bool,
+}
+
+impl Default for PendingExSender {
+	fn default() -> Self {
+		PendingExSender {
+			receiver: None,
+			is_finalized: false,
+		}
+	}
+}
+
+impl PendingExSender {
+
+	pub fn new_watcher(&mut self) -> PendingExWatcher {
+		let (tx, receiver) = tracing_unbounded("mpsc_txpool_pending_watcher");
+		self.receiver = Some(tx);
+		PendingExWatcher {
+			receiver,
+		}
+	}
+
+	pub fn ready(&mut self, ex: Bytes) {
+		self.send(ex)
+	}
+
+	fn send(&mut self, ex: Bytes) {
+		let s = & mut self.receiver;
+		if let Some(x) = s {
+			x.unbounded_send(ex);
+		}
 	}
 }

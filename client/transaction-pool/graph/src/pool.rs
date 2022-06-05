@@ -33,7 +33,7 @@ use sp_transaction_pool::error;
 use wasm_timer::Instant;
 use futures::channel::mpsc::Receiver;
 
-use crate::{base_pool as base, watcher::Watcher};
+use crate::{base_pool as base, watcher::{Watcher, PendingExWatcher}};
 use crate::validated_pool::ValidatedPool;
 pub use crate::validated_pool::{IsValidator, ValidatedTransaction};
 
@@ -209,7 +209,7 @@ impl<B: ChainApi> Pool<B> {
 		).await;
 		self.validated_pool.submit_and_watch(tx)
 	}
-	
+
 	// Watch existing transaction
 	///
 	/// Get notified when some existing transaction is finished verifying or gets finalized
@@ -219,6 +219,16 @@ impl<B: ChainApi> Pool<B> {
 		hash: ExtrinsicHash<B>,
 	) -> Watcher<ExtrinsicHash<B>, ExtrinsicHash<B>> {
 		self.validated_pool.watch(hash)
+	}
+
+	// Watch pending transaction
+	///
+	/// Get notified when some existing transaction is finished verifying or gets finalized
+	/// in a new block.
+	pub fn watch_pending(
+		&self,
+	) -> PendingExWatcher {
+		self.validated_pool.watch_pending()
 	}
 
 	/// Resubmit some transaction that were validated elsewhere.

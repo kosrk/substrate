@@ -23,6 +23,7 @@ use std::{
 	sync::Arc,
 	pin::Pin,
 };
+use sp_core::Bytes;
 use futures::{Future, Stream};
 use serde::{Deserialize, Serialize};
 use sp_runtime::{
@@ -129,6 +130,9 @@ pub enum TransactionStatus<Hash, BlockHash> {
 /// The stream of transaction events.
 pub type TransactionStatusStream<Hash, BlockHash> = dyn Stream<Item=TransactionStatus<Hash, BlockHash>> + Send + Unpin;
 
+/// The stream of pending transaction events.
+pub type ExtrinsicsStream = dyn Stream<Item=Bytes> + Send + Unpin;
+
 /// The import notification event stream.
 pub type ImportNotificationStream<H> = futures::channel::mpsc::Receiver<H>;
 
@@ -142,6 +146,8 @@ pub type TransactionFor<P> = <<P as TransactionPool>::Block as BlockT>::Extrinsi
 pub type TransactionStatusStreamFor<P> = TransactionStatusStream<TxHash<P>, BlockHash<P>>;
 /// Transaction type for a local pool.
 pub type LocalTransactionFor<P> = <<P as LocalTransactionPool>::Block as BlockT>::Extrinsic;
+/// Type of pending transactions event stream for a pool.
+pub type ExtrinsicsStreamFor = ExtrinsicsStream;
 
 /// Typical future type used in transaction pool api.
 pub type PoolFuture<T, E> = std::pin::Pin<Box<dyn Future<Output=Result<T, E>> + Send>>;
@@ -211,11 +217,15 @@ pub trait TransactionPool: Send + Sync {
 		source: TransactionSource,
 		xt: TransactionFor<Self>,
 	) -> PoolFuture<Box<TransactionStatusStreamFor<Self>>, Self::Error>;
-	
+
 	fn watch(
 		&self,
 		hash: TxHash<Self>,
 	) -> PoolFuture<Box<TransactionStatusStreamFor<Self>>, Self::Error>;
+
+	fn watch_pending(
+		&self,
+	) -> PoolFuture<Box<ExtrinsicsStreamFor>, Self::Error>;
 
 	// *** Block production / Networking
 	/// Get an iterator for ready transactions ordered by priority.

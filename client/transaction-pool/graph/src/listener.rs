@@ -25,13 +25,15 @@ use linked_hash_map::LinkedHashMap;
 use serde::Serialize;
 use log::{debug, trace, warn};
 use sp_runtime::traits;
+use sp_core::Bytes;
 
-use crate::{watcher, ChainApi, ExtrinsicHash, BlockHash};
+use crate::{watcher, ChainApi, ExtrinsicHash, BlockHash, TransactionFor, ExtrinsicFor};
 
 /// Extrinsic pool default listener.
 pub struct Listener<H: hash::Hash + Eq, C: ChainApi> {
 	watchers: HashMap<H, watcher::Sender<H, ExtrinsicHash<C>>>,
 	finality_watchers: LinkedHashMap<ExtrinsicHash<C>, Vec<H>>,
+	pending_ex_watcher: watcher::PendingExSender,
 }
 
 /// Maximum number of blocks awaiting finality at any time.
@@ -42,6 +44,7 @@ impl<H: hash::Hash + Eq + Debug, C: ChainApi> Default for Listener<H, C> {
 		Self {
 			watchers: Default::default(),
 			finality_watchers: Default::default(),
+			pending_ex_watcher: Default::default(),
 		}
 	}
 }
@@ -68,6 +71,15 @@ impl<H: hash::Hash + traits::Member + Serialize, C: ChainApi> Listener<H, C> {
 		sender.new_watcher(hash)
 	}
 
+	/// Creates a pending_ex_watcher for given verified extrinsic.
+	///
+	/// The watcher can be used to subscribe to life-cycle events of that extrinsic.
+	pub fn create_pending_ex_watcher(&mut self) -> watcher::PendingExWatcher {
+		self.pending_ex_watcher = watcher::PendingExSender::default();
+		let sender = &mut self.pending_ex_watcher;
+		sender.new_watcher()
+	}
+
 	/// Notify the listeners about extrinsic broadcast.
 	pub fn broadcasted(&mut self, hash: &H, peers: Vec<String>) {
 		trace!(target: "txpool", "[{:?}] Broadcasted", hash);
@@ -75,12 +87,13 @@ impl<H: hash::Hash + traits::Member + Serialize, C: ChainApi> Listener<H, C> {
 	}
 
 	/// New transaction was added to the ready pool or promoted from the future pool.
-	pub fn ready(&mut self, tx: &H, old: Option<&H>) {
+	pub fn ready(&mut self, tx: &H, old: Option<&H>, ex: Bytes) {
 		trace!(target: "txpool", "[{:?}] Ready (replaced with {:?})", tx, old);
 		self.fire(tx, |watcher| watcher.ready());
 		if let Some(old) = old {
 			self.fire(old, |watcher| watcher.usurped(tx.clone()));
 		}
+		self.pending_ex_watcher.ready(ex);
 	}
 
 	/// New transaction was added to the future pool.

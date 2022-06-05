@@ -47,6 +47,7 @@ use sp_transaction_pool::{
 	TransactionSource,
 	TransactionStatusStreamFor,
 	TxHash,
+	ExtrinsicsStreamFor,
 };
 use sp_consensus::{Environment, Proposer};
 
@@ -258,11 +259,17 @@ impl sp_transaction_pool::TransactionPool for Transactions {
 	) -> PoolFuture<Box<TransactionStatusStreamFor<Self>>, Self::Error> {
 		unimplemented!()
 	}
-	
+
 	fn watch(
 		&self,
 		_hash: TxHash<Self>,
 	) -> PoolFuture<Box<TransactionStatusStreamFor<Self>>, Self::Error> {
+		unimplemented!()
+	}
+
+	fn watch_pending(
+		&self,
+	) -> PoolFuture<Box<ExtrinsicsStreamFor>, Self::Error> {
 		unimplemented!()
 	}
 
