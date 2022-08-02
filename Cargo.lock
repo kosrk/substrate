@@ -7763,6 +7763,7 @@ dependencies = [
  "criterion",
  "derive_more",
  "futures 0.3.12",
+ "hex",
  "linked-hash-map",
  "log",
  "parity-scale-codec",

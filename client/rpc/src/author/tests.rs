@@ -376,7 +376,12 @@ fn should_watch_pending_extrinsics() {
 	};
 
 	let ex = uxt(AccountKeyring::Alice, 0);
-	AuthorApi::submit_extrinsic(&p, ex.encode().into()).wait().unwrap();
+	match AuthorApi::submit_extrinsic(&p, ex.encode().into()).wait() {
+		Ok(_) => {}
+		Err(_) => {
+			panic!("Extrinsic rejected");
+		}
+	}
 
 	let (res, data) = executor::block_on(data.into_future().compat()).unwrap();
 	let x = res;

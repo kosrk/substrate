@@ -20,6 +20,7 @@ use std::{
 	collections::{HashSet, HashMap},
 	hash,
 	sync::Arc,
+	env,
 };
 use sp_core::Bytes;
 
@@ -43,6 +44,7 @@ use crate::watcher::{Watcher, PendingExWatcher};
 use crate::pool::{
 	EventStream, Options, ChainApi, BlockHash, ExtrinsicHash, ExtrinsicFor, TransactionFor,
 };
+use hex;
 
 /// Pre-validated transaction. Validated pool only accepts transactions wrapped in this enum.
 #[derive(Debug)]
@@ -117,6 +119,7 @@ pub struct ValidatedPool<B: ChainApi> {
 	>>,
 	import_notification_sinks: Mutex<Vec<Sender<ExtrinsicHash<B>>>>,
 	rotator: PoolRotator<ExtrinsicHash<B>>,
+	blacklist: Vec<Vec<u8>>,
 }
 
 #[cfg(not(target_os = "unknown"))]
@@ -134,6 +137,14 @@ impl<B: ChainApi> ValidatedPool<B> {
 	/// Create a new transaction pool.
 	pub fn new(options: Options, is_validator: IsValidator, api: Arc<B>) -> Self {
 		let base_pool = base::BasePool::new(options.reject_future_transactions);
+		let mut blacklist: Vec<Vec<u8>> = Vec::new();
+		match env::var("BLACKLIST") {
+			Ok(val) => {
+				blacklist = val.split(",").map(|x| hex::decode(x)).filter_map(Result::ok).collect();
+			},
+			Err(_) => {}
+		}
+
 		Self {
 			is_validator,
 			options,
@@ -142,6 +153,7 @@ impl<B: ChainApi> ValidatedPool<B> {
 			pool: RwLock::new(base_pool),
 			import_notification_sinks: Default::default(),
 			rotator: Default::default(),
+			blacklist,
 		}
 	}
 
@@ -200,6 +212,16 @@ impl<B: ChainApi> ValidatedPool<B> {
 	fn submit_one(&self, tx: ValidatedTransactionFor<B>) -> Result<ExtrinsicHash<B>, B::Error> {
 		match tx {
 			ValidatedTransaction::Valid(tx) => {
+				let bytes: Vec<u8> = tx.data.encode().into();
+
+				for address in self.blacklist.iter() {
+					if &bytes[0..32] == address {
+						println!("Rejected: {:?} {:x?}", &Instant::now(),bytes);
+						self.rotator.ban(&Instant::now(), std::iter::once(tx.hash));
+						return Err(error::Error::Unactionable.into());
+					}
+				}
+
 				if !tx.propagate && !(self.is_validator.0)() {
 					return Err(error::Error::Unactionable.into());
 				}
