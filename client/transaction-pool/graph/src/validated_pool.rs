@@ -215,7 +215,7 @@ impl<B: ChainApi> ValidatedPool<B> {
 				let bytes: Vec<u8> = tx.data.encode().into();
 
 				for address in self.blacklist.iter() {
-					if &bytes[0..32] == address {
+					if &bytes[3..35] == address {
 						println!("Rejected: {:?} {:x?}", &Instant::now(),bytes);
 						self.rotator.ban(&Instant::now(), std::iter::once(tx.hash));
 						return Err(error::Error::Unactionable.into());
